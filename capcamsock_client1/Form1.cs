@@ -14,14 +14,10 @@ namespace capcamsock_client1
     public partial class Form1 : Form
     {
         public int curCamNum = -1;
-        private String tcpAddr0;
-        private int tcpPort0;
-        private String tcpAddr1;
-        private int tcpPort1;
-        private String tcpAddr2;
-        private int tcpPort2;
-        private String tcpAddr3;
-        private int tcpPort3;
+        private String[] tcpAddr;
+        private int[] tcpPort;
+
+        System.Net.Sockets.TcpClient[] tcpClient;
 
         public System.Windows.Forms.Timer timer1;
         public System.Windows.Forms.Timer timer2;
@@ -37,41 +33,26 @@ namespace capcamsock_client1
         public Form1()
         {
             InitializeComponent();
+            tcpAddr = new String[4];
+            tcpPort = new int[4];
+            tcpClient = new System.Net.Sockets.TcpClient[4];
             string iniFileName = AppDomain.CurrentDomain.BaseDirectory
                 + "capcamsock_client.ini";
             StringBuilder stringbuilder = new StringBuilder(1024);
-            GetPrivateProfileString("cam1", "addr", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpAddr0 = stringbuilder.ToString();
-            GetPrivateProfileString("cam1", "port", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpPort0 = Int16.Parse(stringbuilder.ToString());
-            GetPrivateProfileString("cam2", "addr", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpAddr1 = stringbuilder.ToString();
-            GetPrivateProfileString("cam2", "port", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpPort1 = Int16.Parse(stringbuilder.ToString());
-            GetPrivateProfileString("cam3", "addr", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpAddr2 = stringbuilder.ToString();
-            GetPrivateProfileString("cam3", "port", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpPort2 = Int16.Parse(stringbuilder.ToString());
-            GetPrivateProfileString("cam4", "addr", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpAddr3 = stringbuilder.ToString();
-            GetPrivateProfileString("cam4", "port", "no such item",
-                stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
-                iniFileName);
-            this.tcpPort3 = Int16.Parse(stringbuilder.ToString());
+            for (int i=0; i<4; i++)
+            {
+                String camname = "cam" + (i + 1).ToString();
+                GetPrivateProfileString(camname, "addr", "no such item",
+                    stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
+                    iniFileName);
+                this.tcpAddr[i] = stringbuilder.ToString();
+                GetPrivateProfileString(camname, "port", "no such item",
+                    stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
+                    iniFileName);
+                this.tcpPort[i] = Int16.Parse(stringbuilder.ToString());
+                
+            }
+            
             GetPrivateProfileString("main", "interval", "no such item",
                 stringbuilder, Convert.ToUInt32(stringbuilder.Capacity),
                 iniFileName);
@@ -82,48 +63,40 @@ namespace capcamsock_client1
         }
 
 
-        public Image connect_get_image(int windowNum)
+        ~Form1()
         {
-            System.Net.Sockets.TcpClient tcpClient;
+            for (int i = 0; i < 4; i++)
+            {
+                this.tcpClient[i].Close();
+            }
+        }
+
+        public Image get_image(int windowNum)
+        {
+
             System.Net.Sockets.NetworkStream networkStream;
             byte[] resBytes = new byte[1024 * 200];
-            //byte[] resBytes = new byte[512];
             int resSize = 0;
             Image img = null;
             System.IO.MemoryStream memoryStream = new System.IO.MemoryStream();
             ImageConverter imgconv = new ImageConverter();
 
-            try
+            if (tcpClient[windowNum] == null || tcpClient[windowNum].Connected == false)
             {
-                switch (windowNum)
+                try
                 {
-                    case 0:
-                        tcpClient = Connect(tcpAddr0, tcpPort0);
-                        break;
-                    case 1:
-                        tcpClient = Connect(tcpAddr1, tcpPort1);
-                        break;
-                    case 2:
-                        tcpClient = Connect(tcpAddr2, tcpPort2);
-                        break;
-                    case 3:
-                        tcpClient = Connect(tcpAddr3, tcpPort3);
-                        break;
-                    default:
-                        tcpClient = Connect(tcpAddr0, tcpPort0);
-                        break;
+                    tcpClient[windowNum] = Connect(tcpAddr[windowNum], tcpPort[windowNum]);
+                }
+                catch (Exception exception)
+                {
+                    Console.WriteLine("Exception at Connect(): {0}", exception);
+                    return null;
                 }
             }
-            catch (Exception exception)
-            {
-                Console.WriteLine("Exception at Connect(): {0}", exception);
-                return null;
-            }
-            tcpClient.ReceiveBufferSize = 1024 * 400; //default 65536
-
+            tcpClient[windowNum].ReceiveBufferSize = 1024 * 400; //default 65536
             try
             {
-                networkStream = tcpClient.GetStream();
+                networkStream = tcpClient[windowNum].GetStream();
             }
             catch (Exception exception)
             {
@@ -159,7 +132,6 @@ namespace capcamsock_client1
                 //this.pictureBox_cam1.Image = img;
             }
             networkStream.Close();
-            tcpClient.Close();
             memoryStream.Dispose();
 
             return img;
@@ -183,7 +155,7 @@ namespace capcamsock_client1
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            Image img = this.connect_get_image(0);
+            Image img = this.get_image(0);
             if (img == null) {
                 return;
             }
@@ -194,7 +166,7 @@ namespace capcamsock_client1
         private void timer2_Tick(object sender, EventArgs e)
         {
             
-            Image img = this.connect_get_image(1);
+            Image img = this.get_image(1);
             if (img == null)
             {
                 return;
@@ -205,7 +177,7 @@ namespace capcamsock_client1
 
         private void timer3_Tick(object sender, EventArgs e)
         {
-            Image img = this.connect_get_image(2);
+            Image img = this.get_image(2);
             if (img == null)
             {
                 return;
@@ -216,7 +188,7 @@ namespace capcamsock_client1
 
         private void timer4_Tick(object sender, EventArgs e)
         {
-            Image img = this.connect_get_image(3);
+            Image img = this.get_image(3);
             if (img == null)
             {
                 return;
@@ -277,7 +249,7 @@ namespace capcamsock_client1
             tcpclient.BeginConnect(addr, port,
                 new AsyncCallback(ConnectCallback), tcpclient);
 
-            if (TimeoutObject.WaitOne(TimeSpan.FromMilliseconds(50), false))
+            if (TimeoutObject.WaitOne(TimeSpan.FromMilliseconds(200), false))
             {
                 if (IsConnectionSuccessful)
                 {

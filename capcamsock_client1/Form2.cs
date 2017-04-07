@@ -21,7 +21,7 @@ namespace capcamsock_client1
         {
             try
             {
-                Image img = ((Form1)this.Owner).connect_get_image(
+                Image img = ((Form1)this.Owner).get_image(
                     ((Form1)this.Owner).curCamNum );                
                 this.pictureBox1.Image = img;
             }
